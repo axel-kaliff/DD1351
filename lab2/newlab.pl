@@ -38,6 +38,7 @@ valid_goal(Goal, Proof) :-
 
 
 box_in_interval(_, [], _) :- fail.
+%% adds current number and value to Box
 box_in_interval([Nr, Value, _], [[[Nr, Value, _] | BoxTail] | _], [[Nr, Value, _] | BoxTail]).
 box_in_interval([Nr, Value, _], [ _ | Tail], Box) :- 
     box_in_interval([Nr, Value, _], Tail, Box).
@@ -46,8 +47,6 @@ box_in_interval([Nr, Value, _], [ _ | Tail], Box) :-
     get_value_in_target(_, [],_) :- fail.
     get_value_in_target(Nr, [[Nr, Value, _] | _], Value).
     get_value_in_target(Nr, [_ | Tail], Row) :- get_value_in_target(Nr, Tail, Row).
-
-
 
     %% ******** CHECKING PROOF *******
 
@@ -83,7 +82,11 @@ valid_proof(Prems, Proof, [[[Row, Value, assumption] | BoxTail] | Tail], ValidRo
 
 %% IMPLICATION INTRODUCTION
    valid_proof(Prems, Proof, [[Row, imp(A,B), impint(X, Y)] | Tail], ValidRows) :-
+
+     %% gets box 
     box_in_interval([X, A, _], ValidRows, Box),
+
+    %% checks that the first row in box has value A and that the last row of the box has value B
     first_in_list(Box, [X, A, _]),
     last_in_list(Box, [Y, B,_ ]),
     valid_proof(Prems, Proof, Tail, [[Row, imp(A,B), impint(X,Y)] | ValidRows]).
@@ -124,27 +127,34 @@ valid_proof(Prems, Proof, Tail ,[[Row, Value, andel1(X)] | ValidRows]).
 %% Checks (1) wether the value of row R is an or-statement, (2) that rows A and X are the beginning
 %% and end of a box and (3) that the last rows of the boxes are in the given value
 valid_proof(Prems, Proof, [[Row, Value, orel(R, A, B, X, Y)] | Tail], ValidRows) :-
+  %% (1) wether the value of row R is an or-statement
   get_value_in_target(R, ValidRows, or(P, Q)),
+
+  %% get boxes
   box_in_interval([A, P, _], ValidRows, first_box),
   box_in_interval([X, Q, _], ValidRows, second_box),
+  %% (2) first elements in both boxes with rows A and X 
   first_in_list(first_box, [A, P, _]),
   first_in_list(second_box, [X, Q, _]),
+  %% (3) compares last rows in boxes with given values
   last_in_list(first_box, [B, Value, _]),
   last_in_list(second_box, [Y, Value, _]),
-  valid_proof(Prems, Proof, Tail, [[Row, Value, orel(R, R, B, X, Y)] | ValidRows]).
 
+  %% moves on to next line if above is true
+  valid_proof(Prems, Proof, Tail, [[Row, Value, orel(R, A, B, X, Y)] | ValidRows]).
 
-
-%% OR INTRODUCTION 2
-valid_proof(Prems, Proof, [[Row, or(A,B), orint2(X)] | Tail], ValidRows) :-
-get_value_in_target(X, ValidRows, B),
-valid_proof(Prems, Proof, Tail, [[Row, or(A,B), orint2(X)] | ValidRows]).
 
 %% OR INTRODUCTION 1
 valid_proof(Prems, Proof, [[Row, or(A,B), orint1(X)] | Tail], ValidRows) :-
 %% checks if the scope contains the value A at row X
 get_value_in_target(X, ValidRows, A),
 valid_proof(Prems, Proof, Tail, [[Row, or(A,B), orint1(X)] | ValidRows]).
+
+
+%% OR INTRODUCTION 2
+valid_proof(Prems, Proof, [[Row, or(A,B), orint2(X)] | Tail], ValidRows) :-
+get_value_in_target(X, ValidRows, B),
+valid_proof(Prems, Proof, Tail, [[Row, or(A,B), orint2(X)] | ValidRows]).
 
 
 %% COPY
@@ -155,14 +165,12 @@ valid_proof(Prems, Proof, Tail, [[Row, Value, copy(X)] | ValidRows]).
 
 %% NEGATIVE INTRODUCTION
 valid_proof(Prems, Proof, [[Row, neg(A), negint(X,Y)] | Tail], ValidRows) :-
+  %% get box
   box_in_interval([X, A, _], ValidRows, Box),
+  %% checks that the first row of the box has value A and that the box ends with a contradiction
   first_in_list(Box, [X, A, _]),
   last_in_list(Box, [Y, cont, _]),
   valid_proof(Prems, Proof, Tail, [[Row, neg(A), negint(X, Y)] | ValidRows]).
-
-
-
-  
 
 
 %% NEGATIVE ELIMINATION (CONTRADICTION)
@@ -176,30 +184,38 @@ valid_proof(Prems, Proof, Tail, [[Row, cont, negel(X, Y)] | ValidRows]).
 
 %% CONTRADICTION ELIMINATION
 valid_proof(Prems, Proof, [[Row, Value, contel(X)] | Tail], ValidRows) :-
+  %% checks if there is a contradiction at row X
   get_value_in_target(X, ValidRows, cont),
   valid_proof(Prems, Proof, Tail, [[Row, Value, contel(X)] | ValidRows]).
 
 
 %% NEGNEG INTRODUCTION
 valid_proof(Prems, Proof, [[Row, Value, negnegint(X)] | Tail], ValidRows) :-
+  %% checks that Value is at row X and unifies it with neg(neg(copy)))
   get_value_in_target(X, ValidRows, Copy), neg(neg(Copy)) = Value,
   valid_proof(Prems, Proof, Tail, [[Row, Value, negnegint(X)] | ValidRows]).
 
 %% NEGNEG ELIMINATION
 valid_proof(Prems, Proof, [[Row, Value, negnegel(X)] | Tail], ValidRows) :-
+  %% checks that there is a negative negative of Value at row X
   get_value_in_target(X, ValidRows, neg(neg(Value))),
   valid_proof(Prems, Proof, Tail, [[Row, Value, negnegel(X)] | ValidRows]).
 
 %% PBC Rule
 valid_proof(Prems, Proof, [[Row, Value, pbc(X, Y)] | Tail], ValidRows) :-
+  %% gets box with beginning at row X
   box_in_interval([X, neg(Value), _], ValidRows, Box),
+  %% checks that there is an negation of Value at the first row in the box 
   first_in_list(Box, [X, neg(Value), _]),
+  %% checks that there is a contradiction at the last row of the box
   last_in_list(Box, [Y, cont, _]),
   valid_proof(Prems, Proof, Tail, [[Row, Value, pbc(X, Y)] | ValidRows]).
 
 %% MT Rule
 valid_proof(Prems, Proof, [[Row, neg(Value), mt(X,Y)] | Tail], ValidRows) :-
+  %% checks that there is an implication Value->B at row X
   get_value_in_target(X, ValidRows, imp(Value, B)),
+  %% checks that there is an negation of B at row Y
   get_value_in_target(Y, ValidRows, neg(B)),
   valid_proof(Prems, Proof, Tail, [[Row, neg(Value), mt(X,Y)] | ValidRows]).
 
